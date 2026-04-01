@@ -1,6 +1,8 @@
 package com.litj.minesweeper.model;
 
+import javafx.event.EventHandler;
 import javafx.scene.image.ImageView;
+import javafx.scene.input.MouseEvent;
 
 import java.io.Serializable;
 
@@ -16,9 +18,13 @@ public class MineSquare {
     private boolean isFlag;
     // 是否问号
     private boolean isQuestionMark;
-
+    // 坐标X，左上角第一个坐标为（0，0）
+    private int positionX;
+    // 坐标Y，左上角第一个坐标为（0，0）
+    private int positionY;
+    // 方格宽度
     public static int width = 40;
-
+    // 方格高度
     public static int height = 40;
 
     public ImageView getIvInfo() {
@@ -75,5 +81,21 @@ public class MineSquare {
 
     public void setHeight(int height) {
         MineSquare.height = height;
+    }
+
+    public int getPositionX() {
+        return positionX;
+    }
+
+    public void setPositionX(int positionX) {
+        this.positionX = positionX;
+    }
+
+    public int getPositionY() {
+        return positionY;
+    }
+
+    public void setPositionY(int positionY) {
+        this.positionY = positionY;
     }
 }

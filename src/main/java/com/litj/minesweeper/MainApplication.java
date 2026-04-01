@@ -10,19 +10,23 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
-import javafx.stage.StageStyle;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.*;
 
-public class HelloApplication extends Application {
+public class MainApplication extends Application {
 
     // 行数
     private int rowCount = 16;
     // 列数
     private int columnCount = 30;
+    // 地雷总数
+    private int mineCount = 99;
 
     private double ratio;
+
+    private Map<String, MineSquare> mineSquareMap;
 
     @Override
     public void start(Stage stage) throws IOException {
@@ -44,15 +48,21 @@ public class HelloApplication extends Application {
     }
 
     private Scene initMineSquare() {
+        mineSquareMap = new HashMap<>();
         VBox vBox = new VBox();
         for (int i = 0; i < rowCount; i++) {
             HBox hBox = new HBox();
             for (int e = 0; e < columnCount; e++) {
-                Image image = new Image(getClass().getResource("/img/button.jpg").toExternalForm());
+                Image image = new Image(getClass().getResource("/img/original.png").toExternalForm());
                 ImageView imageView = new ImageView(image);
                 imageView.setFitWidth(MineSquare.width);
                 imageView.setFitHeight(MineSquare.height);
                 hBox.getChildren().add(imageView);
+                MineSquare mineSquare = new MineSquare();
+                mineSquare.setIvInfo(imageView);
+                mineSquare.setPositionX(columnCount);
+                mineSquare.setPositionY(rowCount);
+                mineSquareMap.put(rowCount + "," + columnCount, mineSquare);
             }
             vBox.getChildren().add(hBox);
         }
@@ -60,6 +70,65 @@ public class HelloApplication extends Application {
         double height = rowCount * MineSquare.height;
         ratio = width / height;
         return new Scene(vBox, width, height);
+    }
+
+    /**
+     * 第一次点击后生成地雷，第一次点击区域总是为空白区域
+     */
+    private void initMineAfterFirstClick() {
+        Random random = new Random();
+        int genarateMineCount = 0;
+        while (true) {
+            int randomX = random.nextInt(columnCount);
+            int randomY = random.nextInt(rowCount);
+            MineSquare mineSquare = mineSquareMap.get(randomX + "," + randomY);
+            if (!mineSquare.isMine()) {
+                mineSquare.setMine(true);
+                genarateMineCount++;
+                if (genarateMineCount == mineCount) {
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < rowCount; i++) {
+            int mineCount = 0;
+            for (int e = 0; e < columnCount; e++) {
+                MineSquare mineSquare1 = mineSquareMap.get((e - 1) + "," + (i - 1));
+                if (mineSquare1 != null && mineSquare1.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare2 = mineSquareMap.get(e + "," + (i - 1));
+                if (mineSquare2 != null && mineSquare2.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare3 = mineSquareMap.get((e + 1) + "," + (i - 1));
+                if (mineSquare3 != null && mineSquare3.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare4 = mineSquareMap.get((e - 1) + "," + i);
+                if (mineSquare4 != null && mineSquare4.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare5 = mineSquareMap.get((e + 1) + "," + i);
+                if (mineSquare5 != null && mineSquare5.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare6 = mineSquareMap.get((e - 1) + "," + (i + 1));
+                if (mineSquare6 != null && mineSquare6.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare7 = mineSquareMap.get(e + "," + (i + 1));
+                if (mineSquare7 != null && mineSquare7.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare8 = mineSquareMap.get((e + 1) + "," + (i + 1));
+                if (mineSquare8 != null && mineSquare8.isMine()) {
+                    mineCount++;
+                }
+                MineSquare mineSquare = mineSquareMap.get(e + "," + i);
+                mineSquare.setMineCount(mineCount);
+            }
+        }
     }
 
     /*
