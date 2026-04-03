@@ -12,6 +12,8 @@ public class MineSquare {
     private ImageView ivInfo;
     // 是否有地雷
     private boolean isMine;
+    // 是否被点开
+    private boolean isOpen;
     // 周围地雷数量，范围0-8
     private int mineCount;
     // 是否插旗
@@ -81,6 +83,14 @@ public class MineSquare {
 
     public void setHeight(int height) {
         MineSquare.height = height;
+    }
+
+    public boolean isOpen() {
+        return isOpen;
+    }
+
+    public void setOpen(boolean open) {
+        isOpen = open;
     }
 
     public int getPositionX() {
