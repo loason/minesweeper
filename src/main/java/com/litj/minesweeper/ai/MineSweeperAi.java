@@ -51,7 +51,8 @@ public class MineSweeperAi {
     }
 
     public void doNext() {
-
+        refreshMine();
+        refreshCanClick();
     }
 
     private void doClick() {
@@ -64,9 +65,42 @@ public class MineSweeperAi {
                 MineInfo mineInfo = mineInfoMap.get(e + ","  + i);
                 if (mineInfo.isOpen() && mineInfo.getMineCount() > 0) {
                     int notOpenCount = 0;
-
+                    notOpenCount = isNotOpen(e - 1, i - 1) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e, i - 1) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e + 1, i - 1) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e - 1, i) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e + 1, i) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e - 1, i + 1) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e, i + 1) ? notOpenCount + 1 : notOpenCount;
+                    notOpenCount = isNotOpen(e + 1, i + 1) ? notOpenCount + 1 : notOpenCount;
+                    if (notOpenCount == mineInfo.getMineCount()) {
+                        setMineIfIsNotOpen(e - 1, i - 1);
+                        setMineIfIsNotOpen(e, i - 1);
+                        setMineIfIsNotOpen(e + 1, i - 1);
+                        setMineIfIsNotOpen(e - 1, i);
+                        setMineIfIsNotOpen(e + 1, i);
+                        setMineIfIsNotOpen(e - 1, i + 1);
+                        setMineIfIsNotOpen(e, i + 1);
+                        setMineIfIsNotOpen(e + 1, i + 1);
+                    }
                 }
             }
+        }
+    }
+
+    private void refreshCanClick() {
+
+    }
+
+    private boolean isNotOpen(int x, int y) {
+        MineInfo mineInfo = mineInfoMap.get(x + "," + y);
+        return mineInfo != null && !mineInfo.isOpen();
+    }
+
+    private void setMineIfIsNotOpen(int x, int y) {
+        MineInfo mineInfo = mineInfoMap.get(x + "," + y);
+        if (mineInfo != null && !mineInfo.isOpen()) {
+            mineInfo.setMine(true);
         }
     }
 
