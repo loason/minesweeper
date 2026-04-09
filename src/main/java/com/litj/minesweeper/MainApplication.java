@@ -1,5 +1,6 @@
 package com.litj.minesweeper;
 
+import com.litj.minesweeper.ai.MineSweeperAi;
 import com.litj.minesweeper.controller.MineController;
 import com.litj.minesweeper.model.MineSquare;
 import javafx.application.Application;
@@ -26,6 +27,12 @@ public class MainApplication extends Application {
 
     private MineController mineController;
 
+    private MineSweeperAi mineSweeperAi;
+
+    public static void main(String [] args) { // main方法
+        launch(args);
+    }
+
     @Override
     public void start(Stage stage) throws IOException {
 //        FXMLLoader fxmlLoader = new FXMLLoader(HelloApplication.class.getResource("hello-view.fxml"));
@@ -33,13 +40,17 @@ public class MainApplication extends Application {
 //        VBox vBox = new VBox();
 //        Scene scene = new Scene(vBox, columnCount * MineSquare.width, rowCount * MineSquare.height);
         stage.setTitle("MineSquare");
-        mineController = new MineController();
+        mineController = new MineController(stage);
         Scene scene = mineController.initMineSquare();
         stage.setScene(scene);
         stage.setResizable(false);
+        mineSweeperAi = new MineSweeperAi(mineController);
+        mineSweeperAi.run();
 //        stage.initStyle(StageStyle.UNDECORATED);
 //        setStageFixedRatio(stage);
         stage.show();
+
+
     }
 
     static InputStream loadResourceAsStream(String source) {
