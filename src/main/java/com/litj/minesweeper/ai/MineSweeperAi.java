@@ -1,16 +1,16 @@
 package com.litj.minesweeper.ai;
 
+import com.litj.minesweeper.ai.model.MineGroupInfo;
 import com.litj.minesweeper.ai.model.MineInfo;
+import com.litj.minesweeper.ai.util.MineUtil;
 import com.litj.minesweeper.controller.MineController;
-import com.litj.minesweeper.model.MineSquare;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.util.Duration;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class MineSweeperAi {
 
@@ -20,7 +20,7 @@ public class MineSweeperAi {
 
     private Timeline timeline;
 
-    private int duration = 1000;
+    private int duration = 100;
     // 行数
     private int rowCount = 16;
     // 列数
@@ -28,12 +28,29 @@ public class MineSweeperAi {
     // 地雷总数
     private int mineCount = 99;
 
+    private Stack<MineInfo> doClickStack;
+
+    private Stack<MineInfo> doFlagStack;
+
+    private Map<String, MineGroupInfo> mineGroupInfoMap;
+
     public MineSweeperAi(MineController mineController) {
         this.mineController = mineController;
-        this.mineInfoMap = new HashMap();
+        this.mineInfoMap = new HashMap<>();
         rowCount = mineController.getRowCount();
         columnCount = mineController.getColumnCount();
         mineCount = mineController.getMineCount();
+        mineController.setOnStatusListener(new MineController.OnStatusListener() {
+            @Override
+            public void onSuccess() {
+                timeline.stop();
+            }
+
+            @Override
+            public void onGameOver() {
+                timeline.stop();
+            }
+        });
     }
 
     public void run() {
@@ -46,20 +63,155 @@ public class MineSweeperAi {
         }));
         timeline.setCycleCount(Timeline.INDEFINITE);
         timeline.play();
+        doClickStack = new Stack<>();
+        doFlagStack = new Stack<>();
         mineController.doSquareLeftClicked(15, 8);
-        mineController.reFreshMineInfo(mineInfoMap);
     }
 
     public void doNext() {
-        refreshMine();
-        refreshCanClick();
+        if (doFlagStack != null && !doFlagStack.isEmpty()) {
+            System.out.print("doFlag" + doFlagStack.size() + "\n");
+            MineInfo mineInfo = doFlagStack.pop();
+            mineController.doSquareRightClicked(mineInfo.getPositionX(), mineInfo.getPositionY());
+            return;
+        }
+        if (doClickStack != null && !doClickStack.isEmpty()) {
+            //点击序列里面如果还有可点击数据，则先做点击
+            doClick();
+            return;
+        }
+        //如无可点击位置，则继续分析
+        doAnalyse();
+
+    }
+
+    /**
+     * 分析局势，判断后续的点击位置
+     */
+    private void doAnalyse() {
+        mineController.reFreshMineInfo(mineInfoMap);
+        refreshFlagMine();
+        refreshCanLeftRightClick();
+        if (doFlagStack.isEmpty() && doClickStack.isEmpty()) {
+            collectGroup();
+            analyseGroup();
+        }
+    }
+
+    /**
+     * 遍历所有已经打开，并且有数字的方格，统计该方格四周未被打开的方格编为一组，并且记录这组方格含有多少个地雷，并且将该组方格编号
+     */
+    private void collectGroup() {
+        System.out.print("collectGroup");
+        if (mineGroupInfoMap == null) {
+            mineGroupInfoMap = new HashMap<>();
+        } else {
+            mineGroupInfoMap.clear();
+        }
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                int mineUnconfirmedCount = MineUtil.getMineUnconfirmedCount(mineInfoMap, mineInfo);
+                if (mineInfo.isOpen() && mineInfo.getMineCount() > 0 && mineUnconfirmedCount > 0) {
+                    MineGroupInfo mineGroupInfo = new MineGroupInfo();
+                    mineGroupInfo.setMineCount(mineUnconfirmedCount);
+                    StringBuilder groupId = new StringBuilder();
+                    addGroupInfo(e - 1, i - 1, groupId, mineGroupInfo);
+                    addGroupInfo(e, i - 1, groupId, mineGroupInfo);
+                    addGroupInfo(e + 1, i - 1, groupId, mineGroupInfo);
+                    addGroupInfo(e - 1, i, groupId, mineGroupInfo);
+                    addGroupInfo(e + 1, i, groupId, mineGroupInfo);
+                    addGroupInfo(e - 1, i + 1, groupId, mineGroupInfo);
+                    addGroupInfo(e, i + 1, groupId, mineGroupInfo);
+                    addGroupInfo(e + 1, i + 1, groupId, mineGroupInfo);
+                    mineGroupInfo.setGroupId(groupId.toString());
+                    mineGroupInfoMap.put(e + "," + i, mineGroupInfo);
+                }
+
+            }
+        }
+    }
+
+    /**
+     * 根据收集的组信息，分析哪些方格可以点击，哪些方格可以插旗
+     */
+    private void analyseGroup() {
+        System.out.print("analyseGroup");
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                if (mineInfo.isOpen() && mineInfo.getMineCount() > 0 && MineUtil.getMineUnconfirmedCount(mineInfoMap, mineInfo) > 0) {
+                    MineGroupInfo mineGroupInfo = mineGroupInfoMap.get(e + "," + i);
+                    if (mineGroupInfo == null) {
+                        continue;
+                    }
+                    doAnalyseGroupItem(e - 1, i - 1, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e, i - 1, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e + 1, i - 1, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e - 1, i, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e + 1, i, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e - 1, i + 1, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e, i + 1, mineGroupInfo, mineInfo);
+                    doAnalyseGroupItem(e + 1, i + 1, mineGroupInfo, mineInfo);
+                }
+            }
+        }
+    }
+
+    private void doAnalyseGroupItem(int x, int y, MineGroupInfo mineGroupInfo, MineInfo mineInfo) {
+        String groupId = mineGroupInfo.getGroupId();
+        MineGroupInfo mineGroupInfoTemp = mineGroupInfoMap.get(x + "," + y);
+        if (mineGroupInfoTemp != null) {
+            String groupIdTemp = mineGroupInfoTemp.getGroupId();
+            if (groupId.contains(groupIdTemp)) {
+                groupId = groupId.replace(groupIdTemp, "");
+                String[] keyList = groupId.split(";");
+                if (keyList.length > 0 && mineGroupInfo.getMineCount() == mineGroupInfoTemp.getMineCount()) {
+                    for (String s : keyList) {
+                        if (mineInfoMap.get(s) != null) {
+                            System.out.print("analyseGroupAndPushClickStack:" + s + "\n");
+                            mineInfo.setClickType(MineInfo.LEFT_CLICK);
+                            doClickStack.push(mineInfoMap.get(s));
+                        }
+                    }
+                }
+                if (keyList.length > 0 && mineGroupInfo.getMineCount() - mineGroupInfoTemp.getMineCount() == keyList.length) {
+                    for (String s : keyList) {
+                        MineInfo mineInfoTemp = mineInfoMap.get(s);
+                        if (mineInfoTemp != null && !mineInfoTemp.isFlag()) {
+                            System.out.print("analyseGroupAndPushFlagStack:" + s + "\n");
+                            mineInfoTemp.setFlag(true);
+                            doFlagStack.push(mineInfoMap.get(s));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void addGroupInfo(int x, int y, StringBuilder groupId, MineGroupInfo mineGroupInfo) {
+        MineInfo mineInfo = mineInfoMap.get(x + "," + y);
+        if (mineInfo != null && !mineInfo.isOpen() && !mineInfo.isFlag()) {
+            mineGroupInfo.addMineInfo(mineInfo);
+            groupId.append(mineInfo.getPositionX() + "," + mineInfo.getPositionY() + ";");
+        }
     }
 
     private void doClick() {
-
+        MineInfo mineInfo = doClickStack.pop();
+        if (mineInfo.getClickType() == MineInfo.LEFT_RIGHT_CLICK) {
+            System.out.print("doLeftRightClick" + doClickStack.size() + "  " + mineInfo.getPositionX() + "," + mineInfo.getPositionY() +"\n");
+            mineController.doSquareMiddleOrLeftRightClicked(mineInfo.getPositionX(), mineInfo.getPositionY());
+        } else if (mineInfo.getClickType() == MineInfo.LEFT_CLICK) {
+            System.out.print("doLeftClick" + doClickStack.size() + "  " + mineInfo.getPositionX() + "," + mineInfo.getPositionY() +"\n");
+            mineController.doSquareLeftClicked(mineInfo.getPositionX(), mineInfo.getPositionY());
+        }
     }
 
-    private void refreshMine() {
+    /**
+     * 检索更新所有可以被标记为地雷的位置
+     */
+    private void refreshFlagMine() {
         for (int i = 0; i < rowCount; i++) {
             for (int e = 0; e < columnCount; e++) {
                 MineInfo mineInfo = mineInfoMap.get(e + ","  + i);
@@ -74,22 +226,52 @@ public class MineSweeperAi {
                     notOpenCount = isNotOpen(e, i + 1) ? notOpenCount + 1 : notOpenCount;
                     notOpenCount = isNotOpen(e + 1, i + 1) ? notOpenCount + 1 : notOpenCount;
                     if (notOpenCount == mineInfo.getMineCount()) {
-                        setMineIfIsNotOpen(e - 1, i - 1);
-                        setMineIfIsNotOpen(e, i - 1);
-                        setMineIfIsNotOpen(e + 1, i - 1);
-                        setMineIfIsNotOpen(e - 1, i);
-                        setMineIfIsNotOpen(e + 1, i);
-                        setMineIfIsNotOpen(e - 1, i + 1);
-                        setMineIfIsNotOpen(e, i + 1);
-                        setMineIfIsNotOpen(e + 1, i + 1);
+                        setMineIfIsNotOpen(e - 1, i - 1, mineInfo);
+                        setMineIfIsNotOpen(e, i - 1, mineInfo);
+                        setMineIfIsNotOpen(e + 1, i - 1, mineInfo);
+                        setMineIfIsNotOpen(e - 1, i, mineInfo);
+                        setMineIfIsNotOpen(e + 1, i, mineInfo);
+                        setMineIfIsNotOpen(e - 1, i + 1, mineInfo);
+                        setMineIfIsNotOpen(e, i + 1, mineInfo);
+                        setMineIfIsNotOpen(e + 1, i + 1, mineInfo);
                     }
+                    mineInfo.setNotOpenCount(notOpenCount);
                 }
             }
         }
     }
 
-    private void refreshCanClick() {
+    /**
+     * 检索更新所有可以被左右键点击的区域
+     */
+    private void refreshCanLeftRightClick() {
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                if (mineInfo.getMineCount() == 0 || !mineInfo.isOpen()) {
+                    continue;
+                }
+                int mineCount =  0;
+                mineCount = isMine(e - 1, i - 1) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e, i - 1) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e + 1, i - 1) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e - 1, i) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e + 1, i) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e - 1, i + 1) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e, i + 1) ? mineCount + 1 : mineCount;
+                mineCount = isMine(e + 1, i + 1) ? mineCount + 1 : mineCount;
+                if (mineCount == mineInfo.getMineCount() && mineInfo.getNotOpenCount() != mineInfo.getMineCount()) {
+                    // 如果周围已经确认的地雷数量等于当前格子显示的数量
+                    mineInfo.setClickType(MineInfo.LEFT_RIGHT_CLICK);
+                    doClickStack.push(mineInfo);
+                }
+            }
+        }
+    }
 
+    private boolean isMine(int x, int y) {
+        MineInfo mineInfo = mineInfoMap.get(x + "," + y);
+        return mineInfo != null && mineInfo.isMine();
     }
 
     private boolean isNotOpen(int x, int y) {
@@ -97,10 +279,14 @@ public class MineSweeperAi {
         return mineInfo != null && !mineInfo.isOpen();
     }
 
-    private void setMineIfIsNotOpen(int x, int y) {
-        MineInfo mineInfo = mineInfoMap.get(x + "," + y);
-        if (mineInfo != null && !mineInfo.isOpen()) {
-            mineInfo.setMine(true);
+    private void setMineIfIsNotOpen(int x, int y, MineInfo mineInfo) {
+        MineInfo mineInfoTemp = mineInfoMap.get(x + "," + y);
+        if (mineInfoTemp != null && !mineInfoTemp.isOpen()) {
+            if (!mineInfoTemp.isFlag()) {
+                mineInfoTemp.setFlag(true);
+//                System.out.print(mineInfo.getPositionX() + "," + mineInfo.getPositionY() + "  addMineConfirmed:" + mineInfoTemp.getPositionX() + "," + mineInfoTemp.getPositionY() + "\n");
+                doFlagStack.push(mineInfoTemp);
+            }
         }
     }
 

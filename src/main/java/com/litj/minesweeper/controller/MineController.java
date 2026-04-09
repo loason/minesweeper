@@ -61,6 +61,8 @@ public class MineController {
 
     private boolean isAiRun;
 
+    private OnStatusListener onStatusListener;
+
     private EventHandler eventHandler = new EventHandler<MouseEvent>() {
         @Override
         public void handle(MouseEvent event) {
@@ -86,7 +88,6 @@ public class MineController {
     }
 
     public Scene initMineSquare() {
-        System.out.print("initMineSquare\n");
         mineCountRemain = mineCount;
         isFirstClick = true;
         openCount = 0;
@@ -102,7 +103,27 @@ public class MineController {
         for (int i = 0; i < rowCount; i++) {
             HBox hBox = new HBox();
             hBox.setAlignment(Pos.CENTER);
+            if (i == 0) {
+                HBox hBoxTemp = new HBox();
+                hBoxTemp.setPadding(new Insets(0, 0, 0, 70));
+                for (int j = 0; j < columnCount; j++) {
+                    Label label = new Label(j + "");
+                    label.setPrefSize(MineSquare.width, MineSquare.height);
+                    label.setTextFill(Color.WHITE);
+                    label.setAlignment(Pos.CENTER);
+                    label.setFont(Font.font(null, FontWeight.BOLD, 15));
+                    hBoxTemp.getChildren().add(label);
+                }
+                vBox.getChildren().add(hBoxTemp);
+            }
             for (int e = 0; e < columnCount; e++) {
+                if (e == 0) {
+                    Label label = new Label(i + "");
+                    label.setPrefSize(MineSquare.width, MineSquare.height);
+                    label.setTextFill(Color.WHITE);
+                    label.setFont(Font.font(null, FontWeight.BOLD, 15));
+                    hBox.getChildren().add(label);
+                }
 //                Image image = new Image(getClass().getResource("/img/original.png").toExternalForm());
                 ImageView imageView = new ImageView();
                 imageView.setFitWidth(MineSquare.width);
@@ -125,6 +146,12 @@ public class MineController {
         hBox.setPadding(new Insets(25, 0, 0, 0));
         Image imageClock = new Image(getClass().getResource("/img/clock.png").toExternalForm());
         ImageView ivClock = new ImageView(imageClock);
+        ivClock.setOnMouseClicked(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                onStatusListener.onSuccess();
+            }
+        });
         ivClock.setFitWidth(50);
         ivClock.setFitHeight(50);
         hBox.getChildren().add(ivClock);
@@ -155,7 +182,6 @@ public class MineController {
     }
 
     private void reset() {
-        System.out.print("reset\n");
         initMineSquare();
         stage.setScene(scene);
     }
@@ -164,7 +190,6 @@ public class MineController {
      * 第一次点击后生成地雷，第一次点击区域总是为空白区域
      */
     public void initMineAfterFirstClick(int x, int y) {
-        System.out.print("initMineAfterFirstClick\n");
         timeline = new Timeline(new KeyFrame(Duration.millis(1000), new EventHandler<ActionEvent>() {
             @Override
             public void handle(ActionEvent event) {
@@ -253,6 +278,7 @@ public class MineController {
         if (mineSquare.isFlag() || mineSquare.isQuestionMark() || mineSquare.isOpen()) {
             return;
         }
+//        System.out.print("doSquareLeftClicked " + x + "," + y + "\n");
         if (mineSquare.isMine()) {
             gameover();
             return;
@@ -276,7 +302,6 @@ public class MineController {
             doSquareLeftClicked(x + 1, y + 1);
         }
         openCount++;
-        System.out.print(openCount + "doSquareLeftClicked\n");
         if (openCount == rowCount * columnCount - mineCount) {
             success();
         }
@@ -327,6 +352,7 @@ public class MineController {
         if (!mineSquare.isOpen() || mineSquare.isFlag() || mineSquare.isQuestionMark()) {
             return;
         }
+//        System.out.print("doSquareMiddleOrLeftRightClicked " + x + "," + y + "\n");
         int flagCount = 0;
         if (isFlag(x - 1, y - 1)) {
             flagCount++;
@@ -394,6 +420,9 @@ public class MineController {
         alert.setTitle("游戏失败");
         alert.setHeaderText("游戏失败");
         timeline.stop();
+        if (onStatusListener != null) {
+            onStatusListener.onGameOver();
+        }
         Optional<ButtonType> result = alert.showAndWait();
         ButtonType buttonType = result.get();
         if (buttonType == ButtonType.OK){
@@ -405,11 +434,13 @@ public class MineController {
      * 游戏通关
      */
     private void success() {
-        System.out.print("success\n");
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("游戏通关");
         alert.setHeaderText("游戏通关");
         timeline.stop();
+        if (onStatusListener != null) {
+            onStatusListener.onSuccess();
+        }
         Optional<ButtonType> result = alert.showAndWait();
         ButtonType buttonType = result.get();
         if (buttonType == ButtonType.OK){
@@ -426,10 +457,24 @@ public class MineController {
                     mineInfo = new MineInfo();
                     mineInfoMap.put(e + ","  + i, mineInfo);
                 }
+                mineInfo.setPositionX(e);
+                mineInfo.setPositionY(i);
                 mineInfo.setOpen(mineSquare.isOpen());
                 mineInfo.setMineCount(mineSquare.getMineCount());
             }
         }
+    }
+
+    public void setOnStatusListener(OnStatusListener onStatusListener) {
+        this.onStatusListener = onStatusListener;
+    }
+
+    public interface OnStatusListener {
+
+        public void onSuccess();
+
+        public void onGameOver();
+
     }
 
     public EventHandler getEventHandler() {
