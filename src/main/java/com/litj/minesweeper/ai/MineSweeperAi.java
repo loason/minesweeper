@@ -2,6 +2,7 @@ package com.litj.minesweeper.ai;
 
 import com.litj.minesweeper.ai.model.MineGroupInfo;
 import com.litj.minesweeper.ai.model.MineInfo;
+import com.litj.minesweeper.ai.model.MineSubGroupInfo;
 import com.litj.minesweeper.ai.util.MineUtil;
 import com.litj.minesweeper.controller.MineController;
 import javafx.animation.KeyFrame;
@@ -34,7 +35,7 @@ public class MineSweeperAi {
 
     private Map<String, MineGroupInfo> mineGroupInfoMap;
 
-    private Map<String, MineGroupInfo> mineSubGroupInfoMap;
+    private Map<String, List<MineSubGroupInfo>> mineSubGroupInfoMap;
 
     public MineSweeperAi(MineController mineController) {
         this.mineController = mineController;
@@ -112,13 +113,63 @@ public class MineSweeperAi {
         }
         for (int i = 0; i < rowCount; i++) {
             for (int e = 0; e < columnCount; e++) {
-                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                MineGroupInfo mineGroupInfo = mineGroupInfoMap.get(e + "," + i);
+                List<MineSubGroupInfo> mineSubGroupInfoList = new ArrayList<>();
+                if (mineGroupInfo != null && mineGroupInfo.getMineCount() > 1) {
+                    String[] mineGroupInfoPositions = mineGroupInfo.getGroupId().split(";");
+                    for (int j = 1; mineGroupInfo.getMineCount() - j > 0; j++) {
+                        List<String> subGroupIdList = MineUtil.getSubGroupList(mineGroupInfoPositions, mineGroupInfoPositions.length - j);
+                        for (String s : subGroupIdList) {
+                            MineSubGroupInfo mineSubGroupInfo = new MineSubGroupInfo();
+                            mineSubGroupInfo.setMineCountAtLeast(mineGroupInfo.getMineCount() - j);
+                            mineSubGroupInfo.setGroupId(s);
+                            String[] mineSubGroupInfoPositions = s.split(";");
+                            Map<String, MineInfo> subGroupMineInfoMap = new HashMap<>();
+                            for (int k = 0; k < mineSubGroupInfoPositions.length; k++) {
+                                subGroupMineInfoMap.put(mineSubGroupInfoPositions[k], mineInfoMap.get(mineSubGroupInfoPositions[k]));
+                            }
+                            mineSubGroupInfo.setMineInfoMap(subGroupMineInfoMap);
+                            mineSubGroupInfoList.add(mineSubGroupInfo);
+                        }
+                    }
+                    mineSubGroupInfoMap.put(e + "," + i, mineSubGroupInfoList);
+                }
             }
         }
     }
 
     private void analyseSubGroup() {
-
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                MineGroupInfo mineGroupInfo = mineGroupInfoMap.get(e + "," + i);
+                if (mineInfo.isOpen() && mineInfo.getMineCount() > 0 && mineGroupInfo != null) {
+                    for (int j = i - 2; j <= i + 2; j++) {
+                        for (int k = e - 2; k <= e + 2; k++) {
+                            if (j == i && k == e) {
+                                continue;
+                            }
+                            List<MineSubGroupInfo> mineSubGroupInfoList = mineSubGroupInfoMap.get(k + "," + j);
+                            if (mineSubGroupInfoList == null) {
+                                continue;
+                            }
+                            for (MineSubGroupInfo mineSubGroupInfo : mineSubGroupInfoList) {
+                                if (mineGroupInfo.getGroupId().contains(mineSubGroupInfo.getGroupId()) && mineGroupInfo.getMineCount() == mineSubGroupInfo.getMineCountAtLeast()) {
+                                    String groupId = mineGroupInfo.getGroupId().replace(mineSubGroupInfo.getGroupId(), "");
+                                    String[] positions = groupId.split(";");
+                                    for (int y = 0; y < positions.length; y++) {
+                                        System.out.print("analyseSubGroupAndPushClickStack:" + positions[y] + "\n");
+                                        MineInfo mineInfoTemp = mineInfoMap.get(positions[y]);
+                                        mineInfoTemp.setClickType(MineInfo.LEFT_CLICK);
+                                        doClickStack.push(mineInfoTemp);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
