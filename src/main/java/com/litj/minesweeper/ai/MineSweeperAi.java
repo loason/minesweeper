@@ -34,6 +34,8 @@ public class MineSweeperAi {
 
     private Map<String, MineGroupInfo> mineGroupInfoMap;
 
+    private Map<String, MineGroupInfo> mineSubGroupInfoMap;
+
     public MineSweeperAi(MineController mineController) {
         this.mineController = mineController;
         this.mineInfoMap = new HashMap<>();
@@ -96,13 +98,34 @@ public class MineSweeperAi {
             collectGroup();
             analyseGroup();
         }
+        if (doFlagStack.isEmpty() && doClickStack.isEmpty()) {
+            collectSubGroup();
+            analyseSubGroup();
+        }
+    }
+
+    private void collectSubGroup() {
+        if (mineSubGroupInfoMap == null) {
+            mineSubGroupInfoMap = new HashMap<>();
+        } else {
+            mineSubGroupInfoMap.clear();
+        }
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+            }
+        }
+    }
+
+    private void analyseSubGroup() {
+
     }
 
     /**
      * 遍历所有已经打开，并且有数字的方格，统计该方格四周未被打开的方格编为一组，并且记录这组方格含有多少个地雷，并且将该组方格编号
      */
     private void collectGroup() {
-        System.out.print("collectGroup");
+        System.out.print("collectGroup\n");
         if (mineGroupInfoMap == null) {
             mineGroupInfoMap = new HashMap<>();
         } else {
@@ -136,7 +159,7 @@ public class MineSweeperAi {
      * 根据收集的组信息，分析哪些方格可以点击，哪些方格可以插旗
      */
     private void analyseGroup() {
-        System.out.print("analyseGroup");
+        System.out.print("analyseGroup\n");
         for (int i = 0; i < rowCount; i++) {
             for (int e = 0; e < columnCount; e++) {
                 MineInfo mineInfo = mineInfoMap.get(e + "," + i);
@@ -168,10 +191,11 @@ public class MineSweeperAi {
                 String[] keyList = groupId.split(";");
                 if (keyList.length > 0 && mineGroupInfo.getMineCount() == mineGroupInfoTemp.getMineCount()) {
                     for (String s : keyList) {
-                        if (mineInfoMap.get(s) != null) {
+                        MineInfo mineInfoTemp = mineInfoMap.get(s);
+                        if (mineInfoTemp != null) {
                             System.out.print("analyseGroupAndPushClickStack:" + s + "\n");
-                            mineInfo.setClickType(MineInfo.LEFT_CLICK);
-                            doClickStack.push(mineInfoMap.get(s));
+                            mineInfoTemp.setClickType(MineInfo.LEFT_CLICK);
+                            doClickStack.push(mineInfoTemp);
                         }
                     }
                 }
@@ -181,7 +205,7 @@ public class MineSweeperAi {
                         if (mineInfoTemp != null && !mineInfoTemp.isFlag()) {
                             System.out.print("analyseGroupAndPushFlagStack:" + s + "\n");
                             mineInfoTemp.setFlag(true);
-                            doFlagStack.push(mineInfoMap.get(s));
+                            doFlagStack.push(mineInfoTemp);
                         }
                     }
                 }
