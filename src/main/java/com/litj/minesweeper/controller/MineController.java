@@ -4,6 +4,7 @@ import com.litj.minesweeper.ai.model.MineInfo;
 import com.litj.minesweeper.model.MineSquare;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -19,13 +20,11 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
-import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 
 public class MineController {
@@ -49,6 +48,8 @@ public class MineController {
 
     private Label lbTime;
 
+    private Label lbPlaying;
+
     private Label lbMineCountRemain;
 
     // 剩下的地雷数量
@@ -60,6 +61,17 @@ public class MineController {
     private int timeCount;
 
     private boolean isAiRun;
+
+    // 玩多少把
+    private int playCount = 10000;
+    // 已经玩了多少把
+    private int alreadyPlayCount;
+    // 是否显示Ai游玩的过程
+    public static boolean showAiPlaying = false;
+
+    private int winCount = 0;
+
+    private int loseCount = 0;
 
     private OnStatusListener onStatusListener;
 
@@ -85,6 +97,7 @@ public class MineController {
 
     public MineController(Stage stage) {
         this.stage = stage;
+        alreadyPlayCount = 1;
     }
 
     public Scene initMineSquare() {
@@ -146,12 +159,6 @@ public class MineController {
         hBox.setPadding(new Insets(25, 0, 0, 0));
         Image imageClock = new Image(getClass().getResource("/img/clock.png").toExternalForm());
         ImageView ivClock = new ImageView(imageClock);
-        ivClock.setOnMouseClicked(new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent event) {
-                onStatusListener.onSuccess();
-            }
-        });
         ivClock.setFitWidth(50);
         ivClock.setFitHeight(50);
         hBox.getChildren().add(ivClock);
@@ -174,31 +181,56 @@ public class MineController {
         hBox.getChildren().add(lbMineCountRemain);
         HBox.setMargin(lbMineCountRemain, new Insets(0, 0, 0, 10));
         vBox.getChildren().add(hBox);
+        hBox = new HBox();
+        hBox.setAlignment(Pos.CENTER);
+        hBox.setPadding(new Insets(25, 0, 0, 0));
+        lbPlaying = new Label("总局数：" + playCount + "     已玩局数：" + alreadyPlayCount + "     赢：" + winCount + "     输：" + loseCount + "     胜率：" + String.format("%.2f%%", 100f * winCount / alreadyPlayCount));
+//        lbPlaying.setPrefSize(100, 50);
+        lbPlaying.setTextFill(Color.WHITE);
+//        textTime.setBackground(new Background(new BackgroundFill(Color.WHITE, null, null)));
+        lbPlaying.setFont(Font.font(null, FontWeight.BOLD, 24));
+        hBox.getChildren().add(lbPlaying);
+        vBox.getChildren().add(hBox);
         double width = columnCount * MineSquare.width + 100;
-        double height = rowCount * MineSquare.height + 150;
+        double height = rowCount * MineSquare.height + 250;
         scene = new Scene(vBox, width, height);
         scene.getStylesheets().add(getClass().getResource("/css/original.css").toExternalForm());
         return scene;
     }
 
     private void reset() {
+        if (alreadyPlayCount == playCount) {
+            return;
+        }
+        System.out.print("reset\n");
         initMineSquare();
-        stage.setScene(scene);
+        Platform.runLater(new Runnable() {
+            @Override
+            public void run() {
+                stage.setScene(scene);
+            }
+        });
+        alreadyPlayCount++;
+        lbPlaying.setText("总局数：" + playCount + "     已玩局数：" + alreadyPlayCount + "     赢：" +
+                winCount + "     输：" + loseCount + "     胜率：" + String.format("%.2f%%", 100f * winCount / alreadyPlayCount));
+        onStatusListener.onGameReset();
     }
 
     /**
      * 第一次点击后生成地雷，第一次点击区域总是为空白区域
      */
     public void initMineAfterFirstClick(int x, int y) {
-        timeline = new Timeline(new KeyFrame(Duration.millis(1000), new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-                timeCount++;
-                lbTime.setText(timeCount + "");
-            }
-        }));
-        timeline.setCycleCount(Timeline.INDEFINITE);
-        timeline.play();
+        if (showAiPlaying) {
+            timeline = new Timeline(new KeyFrame(Duration.millis(1000), new EventHandler<ActionEvent>() {
+                @Override
+                public void handle(ActionEvent event) {
+                    timeCount++;
+                    lbTime.setText(timeCount + "");
+                }
+            }));
+            timeline.setCycleCount(Timeline.INDEFINITE);
+            timeline.play();
+        }
         Random random = new Random();
         int genarateMineCount = 0;
         while (true) {
@@ -285,13 +317,17 @@ public class MineController {
         }
         mineSquare.setOpen(true);
         if (mineSquare.getMineCount() != 0) {
-            Image image = new Image(getClass().getResource("/img/" + mineSquare.getMineCount() + ".png").toExternalForm());
-            mineSquare.getIvInfo().getStyleClass().remove("image");
-            mineSquare.getIvInfo().setImage(image);
+            if (showAiPlaying) {
+                Image image = new Image(getClass().getResource("/img/" + mineSquare.getMineCount() + ".png").toExternalForm());
+                mineSquare.getIvInfo().getStyleClass().remove("image");
+                mineSquare.getIvInfo().setImage(image);
+            }
         } else {
-            Image image = new Image(getClass().getResource("/img/empty.png").toExternalForm());
-            mineSquare.getIvInfo().getStyleClass().remove("image");
-            mineSquare.getIvInfo().setImage(image);
+            if (showAiPlaying) {
+                Image image = new Image(getClass().getResource("/img/empty.png").toExternalForm());
+                mineSquare.getIvInfo().getStyleClass().remove("image");
+                mineSquare.getIvInfo().setImage(image);
+            }
             doSquareLeftClicked(x - 1, y - 1);
             doSquareLeftClicked(x, y - 1);
             doSquareLeftClicked(x + 1, y - 1);
@@ -320,25 +356,31 @@ public class MineController {
         if (mineSquare.isFlag()) {
             mineSquare.setFlag(false);
             mineSquare.setQuestionMark(true);
-            Image image = new Image(getClass().getResource("/img/question_mark.png").toExternalForm());
-            mineSquare.getIvInfo().getStyleClass().remove("image");
-            mineSquare.getIvInfo().setImage(image);
             mineCountRemain++;
-            lbMineCountRemain.setText(mineCountRemain + "");
+            if (showAiPlaying) {
+                Image image = new Image(getClass().getResource("/img/question_mark.png").toExternalForm());
+                mineSquare.getIvInfo().getStyleClass().remove("image");
+                mineSquare.getIvInfo().setImage(image);
+                lbMineCountRemain.setText(mineCountRemain + "");
+            }
         } else if (mineSquare.isQuestionMark()) {
             mineSquare.setFlag(false);
             mineSquare.setQuestionMark(false);
-            Image image = new Image(getClass().getResource("/img/original.png").toExternalForm());
-            mineSquare.getIvInfo().getStyleClass().add("image");
-            mineSquare.getIvInfo().setImage(image);
+            if (showAiPlaying) {
+                Image image = new Image(getClass().getResource("/img/original.png").toExternalForm());
+                mineSquare.getIvInfo().getStyleClass().add("image");
+                mineSquare.getIvInfo().setImage(image);
+            }
         } else {
             mineSquare.setFlag(true);
             mineSquare.setQuestionMark(false);
-            mineSquare.getIvInfo().getStyleClass().remove("image");
-            Image image = new Image(getClass().getResource("/img/flag.png").toExternalForm());
-            mineSquare.getIvInfo().setImage(image);
             mineCountRemain--;
-            lbMineCountRemain.setText(mineCountRemain + "");
+            if (showAiPlaying) {
+                lbMineCountRemain.setText(mineCountRemain + "");
+                mineSquare.getIvInfo().getStyleClass().remove("image");
+                Image image = new Image(getClass().getResource("/img/flag.png").toExternalForm());
+                mineSquare.getIvInfo().setImage(image);
+            }
         }
     }
 
@@ -402,7 +444,7 @@ public class MineController {
         for (int i = 0; i < rowCount; i++) {
             for (int e = 0; e < columnCount; e++) {
                 MineSquare mineSquare = mineSquareMap.get(e + ","  + i);
-                if (mineSquare.isMine()) {
+                if (mineSquare.isMine() && !mineSquare.isFlag() && showAiPlaying) {
                     Image image = new Image(getClass().getResource("/img/mine_square.png").toExternalForm());
                     mineSquare.getIvInfo().getStyleClass().remove("image");
                     mineSquare.getIvInfo().setImage(image);
@@ -415,17 +457,26 @@ public class MineController {
      * 游戏失败
      */
     private void gameover() {
-        showAllMine();
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("游戏失败");
-        alert.setHeaderText("游戏失败");
-        timeline.stop();
         if (onStatusListener != null) {
             onStatusListener.onGameOver();
+            loseCount++;
+            lbPlaying.setText("总局数：" + playCount + "     已玩局数：" + alreadyPlayCount + "     赢：" +
+                    winCount + "     输：" + loseCount + "     胜率：" + String.format("%.2f%%", 100f * winCount / alreadyPlayCount));
         }
-        Optional<ButtonType> result = alert.showAndWait();
-        ButtonType buttonType = result.get();
-        if (buttonType == ButtonType.OK){
+        if (showAiPlaying) {
+            showAllMine();
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("游戏失败");
+            alert.setHeaderText("游戏失败");
+            timeline.stop();
+            alert.show();
+            alert.setOnHidden(new EventHandler<DialogEvent>() {
+                @Override
+                public void handle(DialogEvent event) {
+                    reset();
+                }
+            });
+        } else {
             reset();
         }
     }
@@ -434,16 +485,25 @@ public class MineController {
      * 游戏通关
      */
     private void success() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("游戏通关");
-        alert.setHeaderText("游戏通关");
-        timeline.stop();
         if (onStatusListener != null) {
             onStatusListener.onSuccess();
+            winCount++;
+            lbPlaying.setText("总局数：" + playCount + "     已玩局数：" + alreadyPlayCount + "     赢：" +
+                    winCount + "     输：" + loseCount + "     胜率：" + String.format("%.2f%%", 100f * winCount / alreadyPlayCount));
         }
-        Optional<ButtonType> result = alert.showAndWait();
-        ButtonType buttonType = result.get();
-        if (buttonType == ButtonType.OK){
+        if (showAiPlaying) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("游戏通关");
+            alert.setHeaderText("游戏通关");
+            timeline.stop();
+            alert.show();
+            alert.setOnHidden(new EventHandler<DialogEvent>() {
+                @Override
+                public void handle(DialogEvent event) {
+                    reset();
+                }
+            });
+        } else {
             reset();
         }
     }
@@ -471,9 +531,11 @@ public class MineController {
 
     public interface OnStatusListener {
 
-        public void onSuccess();
+        void onSuccess();
 
-        public void onGameOver();
+        void onGameOver();
+
+        void onGameReset();
 
     }
 

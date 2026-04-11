@@ -7,11 +7,14 @@ import com.litj.minesweeper.ai.util.MineUtil;
 import com.litj.minesweeper.controller.MineController;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.concurrent.Task;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.util.Duration;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class MineSweeperAi {
 
@@ -21,7 +24,7 @@ public class MineSweeperAi {
 
     private Timeline timeline;
 
-    private int duration = 100;
+    private int duration = 10;
     // 行数
     private int rowCount = 16;
     // 列数
@@ -37,6 +40,8 @@ public class MineSweeperAi {
 
     private Map<String, List<MineSubGroupInfo>> mineSubGroupInfoMap;
 
+    private Task<Integer> task;
+
     public MineSweeperAi(MineController mineController) {
         this.mineController = mineController;
         this.mineInfoMap = new HashMap<>();
@@ -46,29 +51,76 @@ public class MineSweeperAi {
         mineController.setOnStatusListener(new MineController.OnStatusListener() {
             @Override
             public void onSuccess() {
-                timeline.stop();
+                if (MineController.showAiPlaying) {
+                    timeline.stop();
+                }
             }
 
             @Override
             public void onGameOver() {
-                timeline.stop();
+                if (MineController.showAiPlaying) {
+                    timeline.stop();
+                }
+            }
+
+            @Override
+            public void onGameReset() {
+                System.out.print("onGameReset\n");
+                if (doClickStack != null) {
+                    doClickStack.clear();
+                }
+                if (doFlagStack != null) {
+                    doFlagStack.clear();
+                }
+                if (mineInfoMap != null) {
+                    mineInfoMap.clear();
+                }
+                if (mineGroupInfoMap != null) {
+                    mineGroupInfoMap.clear();
+                }
+                if (mineSubGroupInfoMap != null) {
+                    mineSubGroupInfoMap.clear();
+                }
+                mineController.doSquareLeftClicked(15, 8);
+                if (MineController.showAiPlaying) {
+                    timeline.play();
+                }
             }
         });
     }
 
     public void run() {
         mineController.setAiRun(true);
-        timeline = new Timeline(new KeyFrame(Duration.millis(duration), new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent event) {
-                doNext();
-            }
-        }));
-        timeline.setCycleCount(Timeline.INDEFINITE);
-        timeline.play();
         doClickStack = new Stack<>();
         doFlagStack = new Stack<>();
         mineController.doSquareLeftClicked(15, 8);
+        if (MineController.showAiPlaying) {
+            timeline = new Timeline(new KeyFrame(Duration.millis(duration), new EventHandler<ActionEvent>() {
+                @Override
+                public void handle(ActionEvent event) {
+                    doNext();
+                }
+            }));
+            timeline.setCycleCount(Timeline.INDEFINITE);
+            timeline.play();
+        } else {
+            loop();
+        }
+
+    }
+
+    public void loop() {
+        ExecutorService executor = Executors.newCachedThreadPool();
+        task = new Task<>() {
+            @Override
+            protected Integer call() {
+                while (true) {
+                    doNext();
+                    System.out.print("loop\n");
+                }
+            }
+        };
+        executor.submit(task);
     }
 
     public void doNext() {
@@ -103,6 +155,45 @@ public class MineSweeperAi {
             collectSubGroup();
             analyseSubGroup();
         }
+        if (doFlagStack.isEmpty() && doClickStack.isEmpty()) {
+            guess();
+        }
+    }
+
+    /**
+     * 牢住了，猜吧
+     */
+    private void guess() {
+        int x = 0;
+        int y = 0;
+        float ratio = 0;
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                if (x == 0 && y == 0 && !mineInfoMap.get(e + "," + i).isOpen() && !mineInfoMap.get(e + "," + i).isFlag()) {
+                    // 找第一个没开过的格子为初始值
+                    x = e;
+                    y = i;
+                }
+                MineGroupInfo mineGroupInfo = mineGroupInfoMap.get(e + "," + i);
+                if (mineGroupInfo == null) {
+                    continue;
+                }
+                float mineRatio = (float) mineGroupInfo.getMineCount() / mineGroupInfo.getMineInfoMap().size();
+                if (ratio == 0) {
+                    ratio = mineRatio;
+                }
+                if (mineRatio > ratio) {
+                    ratio = mineRatio;
+                    MineInfo mineInfo = MineUtil.getFirstMineInfo(mineGroupInfo);
+                    x = mineInfo.getPositionX();
+                    y = mineInfo.getPositionY();
+                }
+            }
+        }
+        System.out.print("guessAndPushClickStack:" + x + "," + y + "\n");
+        MineInfo mineInfo = mineInfoMap.get(x + "," + y);
+        mineInfo.setClickType(MineInfo.LEFT_CLICK);
+        doClickStack.push(mineInfo);
     }
 
     private void collectSubGroup() {
@@ -154,14 +245,19 @@ public class MineSweeperAi {
                                 continue;
                             }
                             for (MineSubGroupInfo mineSubGroupInfo : mineSubGroupInfoList) {
-                                if (mineGroupInfo.getGroupId().contains(mineSubGroupInfo.getGroupId()) && mineGroupInfo.getMineCount() == mineSubGroupInfo.getMineCountAtLeast()) {
-                                    String groupId = mineGroupInfo.getGroupId().replace(mineSubGroupInfo.getGroupId(), "");
+                                if (MineUtil.contains(mineGroupInfo.getGroupId(), mineSubGroupInfo.getGroupId())) {
+                                    String groupId = MineUtil.replace(mineGroupInfo.getGroupId(), mineSubGroupInfo.getGroupId());
                                     String[] positions = groupId.split(";");
-                                    for (int y = 0; y < positions.length; y++) {
-                                        System.out.print("analyseSubGroupAndPushClickStack:" + positions[y] + "\n");
-                                        MineInfo mineInfoTemp = mineInfoMap.get(positions[y]);
-                                        mineInfoTemp.setClickType(MineInfo.LEFT_CLICK);
-                                        doClickStack.push(mineInfoTemp);
+                                    if (mineGroupInfo.getMineCount() == mineSubGroupInfo.getMineCountAtLeast()) {
+                                        for (int y = 0; y < positions.length; y++) {
+                                            System.out.print("analyseSubGroupAndPushClickStack:" + positions[y] + "\n");
+                                            MineInfo mineInfoTemp = mineInfoMap.get(positions[y]);
+                                            mineInfoTemp.setClickType(MineInfo.LEFT_CLICK);
+                                            doClickStack.push(mineInfoTemp);
+                                        }
+                                    }
+                                    if (mineGroupInfo.getMineCount() - mineSubGroupInfo.getMineCountAtLeast() == positions.length) {
+
                                     }
                                 }
                             }
@@ -219,14 +315,14 @@ public class MineSweeperAi {
                     if (mineGroupInfo == null) {
                         continue;
                     }
-                    doAnalyseGroupItem(e - 1, i - 1, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e, i - 1, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e + 1, i - 1, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e - 1, i, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e + 1, i, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e - 1, i + 1, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e, i + 1, mineGroupInfo, mineInfo);
-                    doAnalyseGroupItem(e + 1, i + 1, mineGroupInfo, mineInfo);
+                    for (int j = i - 2; j <= i + 2; j++){
+                        for (int k = e - 2; k <= e + 2; k++){
+                            if (j == i && k == e) {
+                                continue;
+                            }
+                            doAnalyseGroupItem(k, j, mineGroupInfo, mineInfo);
+                        }
+                    }
                 }
             }
         }
@@ -237,14 +333,14 @@ public class MineSweeperAi {
         MineGroupInfo mineGroupInfoTemp = mineGroupInfoMap.get(x + "," + y);
         if (mineGroupInfoTemp != null) {
             String groupIdTemp = mineGroupInfoTemp.getGroupId();
-            if (groupId.contains(groupIdTemp)) {
-                groupId = groupId.replace(groupIdTemp, "");
+            if (MineUtil.contains(groupId, groupIdTemp)) {
+                groupId = MineUtil.replace(groupId, groupIdTemp);
                 String[] keyList = groupId.split(";");
                 if (keyList.length > 0 && mineGroupInfo.getMineCount() == mineGroupInfoTemp.getMineCount()) {
                     for (String s : keyList) {
                         MineInfo mineInfoTemp = mineInfoMap.get(s);
                         if (mineInfoTemp != null) {
-                            System.out.print("analyseGroupAndPushClickStack:" + s + "\n");
+                            System.out.print("analyseGroupAndPushClickStack:" + s + "    " + mineInfo.getPositionX() + "," + mineInfo.getPositionY() + "\n");
                             mineInfoTemp.setClickType(MineInfo.LEFT_CLICK);
                             doClickStack.push(mineInfoTemp);
                         }

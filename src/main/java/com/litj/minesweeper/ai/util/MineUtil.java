@@ -1,5 +1,6 @@
 package com.litj.minesweeper.ai.util;
 
+import com.litj.minesweeper.ai.model.MineGroupInfo;
 import com.litj.minesweeper.ai.model.MineInfo;
 
 import java.util.ArrayList;
@@ -84,8 +85,27 @@ public class MineUtil {
         }
     }
 
-    // 1,2,3,4,5
-    // 2,3,4,5
-    // 3,4,5
+    public static boolean contains(String groupIdA, String groupIdB) {
+        String[] groupIdBList = groupIdB.split(";");
+        for (int i = 0; i < groupIdBList.length; i++) {
+            if (!groupIdA.contains(groupIdBList[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static String replace(String groupIdA, String groupIdB) {
+        String[] groupIdBList = groupIdB.split(";");
+        for (int i = 0; i < groupIdBList.length; i++) {
+            groupIdA = groupIdA.replace(groupIdBList[i] + ";", "");
+        }
+        return groupIdA;
+    }
+
+    public static MineInfo getFirstMineInfo(MineGroupInfo mineGroupInfo) {
+        String[] groupIdList = mineGroupInfo.getGroupId().split(";");
+        return mineGroupInfo.getMineInfoMap().get(groupIdList[0]);
+    }
 
 }
