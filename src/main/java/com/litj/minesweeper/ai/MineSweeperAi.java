@@ -40,6 +40,8 @@ public class MineSweeperAi {
 
     private Map<String, List<MineSubGroupInfo>> mineSubGroupInfoMap;
 
+    private Map<String, List<MineGroupInfo>> mineAllConfirmedGroupInfoMap;
+
     private Task<Integer> task;
 
     public MineSweeperAi(MineController mineController) {
@@ -156,7 +158,148 @@ public class MineSweeperAi {
             analyseSubGroup();
         }
         if (doFlagStack.isEmpty() && doClickStack.isEmpty()) {
-            guess();
+            analyseAllConfirmedGroup();
+        }
+        if (doFlagStack.isEmpty() && doClickStack.isEmpty()) {
+//            guess();
+        }
+    }
+
+    /**
+     * 分析所有确定的组
+     */
+    private void analyseAllConfirmedGroup() {
+        System.out.print("analyseAllConfirmedGroup:\n");
+        if (mineAllConfirmedGroupInfoMap == null) {
+            mineAllConfirmedGroupInfoMap = new HashMap<>();
+        } else {
+            mineAllConfirmedGroupInfoMap.clear();
+        }
+        boolean findNewConfirmedGroup = false;
+        for (int i = 0; i < rowCount; i++) {
+            for (int e = 0; e < columnCount; e++) {
+                MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                MineGroupInfo mineGroupInfo = mineGroupInfoMap.get(e + "," + i);
+                if (mineInfo.isOpen() && mineGroupInfo != null && mineGroupInfo.getMineCount() > 1) {
+                    List<MineGroupInfo> mineGroupInfoList = new ArrayList<>();
+                    mineGroupInfoList.add(mineGroupInfo);
+                    mineAllConfirmedGroupInfoMap.put(e + "," + i, mineGroupInfoList);
+                    for (int j = i - 2; j <= i + 2; j++) {
+                        for (int k = e - 2; k <= e + 2; k++) {
+                            if (j == i && k == e) {
+                                continue;
+                            }
+                            MineGroupInfo mineGroupInfoTemp = mineGroupInfoMap.get(k + "," + j);
+                            if (mineGroupInfoTemp == null) {
+                                continue;
+                            }
+                            String groupId = mineGroupInfo.getGroupId();
+                            String groupIdTemp = mineGroupInfoTemp.getGroupId();
+                            if (MineUtil.contains(groupId, groupIdTemp)) {
+                                groupId = MineUtil.replace(groupId, groupIdTemp);
+                                String[] keyList = groupId.split(";");
+                                if (keyList.length > 0 && mineGroupInfo.getMineCount() - mineGroupInfoTemp.getMineCount() < keyList.length) {
+                                    MineGroupInfo newConfirmedGroupInfo = new MineGroupInfo();
+                                    newConfirmedGroupInfo.setGroupId(groupId);
+                                    newConfirmedGroupInfo.setMineCount(mineGroupInfo.getMineCount() - mineGroupInfoTemp.getMineCount());
+                                    Map<String, MineInfo> newConfirmedGroupMineInfoMap = new HashMap<>();
+                                    for (String s : keyList) {
+                                        newConfirmedGroupMineInfoMap.put(s, mineInfoMap.get(s));
+                                    }
+                                    newConfirmedGroupInfo.setMineInfoMap(newConfirmedGroupMineInfoMap);
+                                    mineGroupInfoList.add(newConfirmedGroupInfo);
+                                    findNewConfirmedGroup = true;
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+        if (findNewConfirmedGroup) {
+            findNewConfirmedGroupLoop();
+        }
+    }
+
+    private void findNewConfirmedGroupLoop() {
+        System.out.print("findNewConfirmedGroupLoop:\n");
+        while (true) {
+            boolean findNewConfirmedGroup = false;
+            for (int i = 0; i < rowCount; i++) {
+                for (int e = 0; e < columnCount; e++) {
+                    MineInfo mineInfo = mineInfoMap.get(e + "," + i);
+                    MineGroupInfo mineGroupInfo = mineGroupInfoMap.get(e + "," + i);
+                    if (mineInfo.isOpen() && mineGroupInfo != null && mineGroupInfo.getMineCount() > 0) {
+                        List<MineGroupInfo> mineGroupInfoList = mineAllConfirmedGroupInfoMap.get(e + "," + i);
+                        if (mineGroupInfoList == null) {
+                            continue;
+                        }
+                        ListIterator<MineGroupInfo> iterator = mineGroupInfoList.listIterator();
+                        while (iterator.hasNext()) {
+                            MineGroupInfo mineGroupInfoItem = iterator.next();
+                            for (int j = i - 2; j <= i + 2; j++) {
+                                for (int k = e - 2; k <= e + 2; k++) {
+                                    if (j == i && k == e) {
+                                        continue;
+                                    }
+                                    List<MineGroupInfo> mineGroupInfoListTemp = mineAllConfirmedGroupInfoMap.get(k + "," + j);
+                                    if (mineGroupInfoListTemp == null) {
+                                        continue;
+                                    }
+                                    for (MineGroupInfo mineGroupInfoTempItem : mineGroupInfoListTemp) {
+                                        String groupId = mineGroupInfoItem.getGroupId();
+                                        String groupIdTemp = mineGroupInfoTempItem.getGroupId();
+                                        if (MineUtil.contains(groupId, groupIdTemp)) {
+                                            groupId = MineUtil.replace(groupId, groupIdTemp);
+                                            if (MineUtil.isAlreadyContainsInList(groupId, mineGroupInfoList)) {
+                                                continue;
+                                            }
+                                            String[] keyList = groupId.split(";");
+                                            if (keyList.length > 0 && mineGroupInfoItem.getMineCount() - mineGroupInfoTempItem.getMineCount() < keyList.length) {
+                                                MineGroupInfo newConfirmedGroupInfo = new MineGroupInfo();
+                                                newConfirmedGroupInfo.setGroupId(groupId);
+                                                newConfirmedGroupInfo.setMineCount(mineGroupInfoItem.getMineCount() - mineGroupInfoTempItem.getMineCount());
+                                                Map<String, MineInfo> newConfirmedGroupMineInfoMap = new HashMap<>();
+                                                for (String s : keyList) {
+                                                    newConfirmedGroupMineInfoMap.put(s, mineInfoMap.get(s));
+                                                }
+                                                newConfirmedGroupInfo.setMineInfoMap(newConfirmedGroupMineInfoMap);
+                                                iterator.add(newConfirmedGroupInfo);
+                                                System.out.print("findNewConfirmedGroupLoop:true\n");
+                                                findNewConfirmedGroup = true;
+                                            }
+                                            if (keyList.length > 0 && mineGroupInfoItem.getMineCount() == mineGroupInfoTempItem.getMineCount()) {
+                                                for (String s : keyList) {
+                                                    MineInfo mineInfoTemp = mineInfoMap.get(s);
+                                                    if (mineInfoTemp != null) {
+                                                        System.out.print("findNewConfirmedGroupLoopAndPushClickStack:" + s + "    " + mineInfo.getPositionX() + "," + mineInfo.getPositionY() + "\n");
+                                                        mineInfoTemp.setClickType(MineInfo.LEFT_CLICK);
+                                                        doClickStack.push(mineInfoTemp);
+                                                    }
+                                                }
+                                            }
+                                            if (keyList.length > 0 && mineGroupInfoItem.getMineCount() - mineGroupInfoTempItem.getMineCount() == keyList.length) {
+                                                for (String s : keyList) {
+                                                    MineInfo mineInfoTemp = mineInfoMap.get(s);
+                                                    if (mineInfoTemp != null && !mineInfoTemp.isFlag()) {
+                                                        System.out.print("findNewConfirmedGroupLoopAndPushFlagStack:" + s + "\n");
+                                                        mineInfoTemp.setFlag(true);
+                                                        doFlagStack.push(mineInfoTemp);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!findNewConfirmedGroup) {
+                break;
+            }
         }
     }
 
@@ -182,7 +325,7 @@ public class MineSweeperAi {
                 if (ratio == 0) {
                     ratio = mineRatio;
                 }
-                if (mineRatio > ratio) {
+                if (mineRatio < ratio) {
                     ratio = mineRatio;
                     MineInfo mineInfo = MineUtil.getFirstMineInfo(mineGroupInfo);
                     x = mineInfo.getPositionX();

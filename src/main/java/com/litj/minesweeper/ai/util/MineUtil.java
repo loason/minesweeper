@@ -108,4 +108,13 @@ public class MineUtil {
         return mineGroupInfo.getMineInfoMap().get(groupIdList[0]);
     }
 
+    public static boolean isAlreadyContainsInList(String groupId, List<MineGroupInfo> mineGroupInfoList) {
+        for (MineGroupInfo mineGroupInfo : mineGroupInfoList) {
+            if (mineGroupInfo.getGroupId().equals(groupId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

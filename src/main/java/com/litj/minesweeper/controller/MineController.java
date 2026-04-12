@@ -67,7 +67,7 @@ public class MineController {
     // 已经玩了多少把
     private int alreadyPlayCount;
     // 是否显示Ai游玩的过程
-    public static boolean showAiPlaying = false;
+    public static boolean showAiPlaying = true;
 
     private int winCount = 0;
 
@@ -159,6 +159,12 @@ public class MineController {
         hBox.setPadding(new Insets(25, 0, 0, 0));
         Image imageClock = new Image(getClass().getResource("/img/clock.png").toExternalForm());
         ImageView ivClock = new ImageView(imageClock);
+        ivClock.setOnMouseClicked(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                reset();
+            }
+        });
         ivClock.setFitWidth(50);
         ivClock.setFitHeight(50);
         hBox.getChildren().add(ivClock);
