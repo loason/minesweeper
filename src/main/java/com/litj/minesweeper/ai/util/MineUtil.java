@@ -86,6 +86,9 @@ public class MineUtil {
     }
 
     public static boolean contains(String groupIdA, String groupIdB) {
+        if (groupIdA.equals(groupIdB)) {
+            return false;
+        }
         String[] groupIdBList = groupIdB.split(";");
         for (int i = 0; i < groupIdBList.length; i++) {
             if (!groupIdA.contains(groupIdBList[i])) {
@@ -95,12 +98,27 @@ public class MineUtil {
         return true;
     }
 
-    public static String replace(String groupIdA, String groupIdB) {
+    public static String remove(String groupIdA, String groupIdB) {
+        System.out.print("removeGroupIdA:" + groupIdA + "\n");
+        System.out.print("removeGroupIdB:" + groupIdB + "\n");
+        String[] groupIdAList = groupIdA.split(";");
         String[] groupIdBList = groupIdB.split(";");
-        for (int i = 0; i < groupIdBList.length; i++) {
-            groupIdA = groupIdA.replace(groupIdBList[i] + ";", "");
+        for (int i = 0; i < groupIdAList.length; i++) {
+            for (int e = 0; e < groupIdBList.length; e++) {
+                if (groupIdAList[i].equals(groupIdBList[e])) {
+                    groupIdAList[i] = "";
+                    break;
+                }
+            }
         }
-        return groupIdA;
+        StringBuilder sb = new StringBuilder();
+        for (String s : groupIdAList) {
+            if (!"".equals(s)) {
+                sb.append(s + ";");
+            }
+        }
+        System.out.print("removeResult:" + sb.toString() + "\n");
+        return sb.toString();
     }
 
     public static MineInfo getFirstMineInfo(MineGroupInfo mineGroupInfo) {
@@ -115,6 +133,15 @@ public class MineUtil {
             }
         }
         return false;
+    }
+
+    public static void addItemIfNotContain(List<MineGroupInfo> mineGroupInfoList, MineGroupInfo mineGroupInfo) {
+        for (MineGroupInfo mineGroupInfoTemp : mineGroupInfoList) {
+            if(mineGroupInfoTemp.getGroupId().equals(mineGroupInfo.getGroupId())) {
+                return;
+            }
+        }
+        mineGroupInfoList.add(mineGroupInfo);
     }
 
 }

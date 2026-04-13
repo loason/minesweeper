@@ -63,11 +63,11 @@ public class MineController {
     private boolean isAiRun;
 
     // 玩多少把
-    private int playCount = 10000;
+    private int playCount = 50000;
     // 已经玩了多少把
     private int alreadyPlayCount;
     // 是否显示Ai游玩的过程
-    public static boolean showAiPlaying = true;
+    public static boolean showAiPlaying = false;
 
     private int winCount = 0;
 
@@ -583,5 +583,9 @@ public class MineController {
 
     public void setMineCount(int mineCount) {
         this.mineCount = mineCount;
+    }
+
+    public int getMineCountRemain() {
+        return mineCountRemain;
     }
 }
